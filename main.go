@@ -9,22 +9,32 @@ import (
 	"sync"
 )
 
+var (
+	mu       sync.Mutex
+	payments = make(map[int64]Payment)
+)
+
 type Payment struct {
 	ID          int64  `json:"id"`
 	Amount      int64  `json:"amount"`
 	Description string `json:"description"`
 }
 
-var (
-	mu       sync.Mutex
-	payments = make(map[int64]Payment)
-)
+type errorResponse struct {
+	Error string `json:"error"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
+}
 
 func getPayment(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid id"})
 		return
 	}
 	log.Println("id:", id)
@@ -33,12 +43,10 @@ func getPayment(w http.ResponseWriter, r *http.Request) {
 	defer mu.Unlock()
 	p, ok := payments[id]
 	if !ok {
-		w.WriteHeader(http.StatusNotFound)
+		writeJSON(w, http.StatusNotFound, errorResponse{Error: "payment not found"})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(p)
+	writeJSON(w, http.StatusOK, p)
 }
 
 func main() {
