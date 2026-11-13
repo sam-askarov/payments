@@ -1,0 +1,8 @@
+# собранные бинарники
+/payments
+*.exe
+
+# файлы IDE и macOS
+.idea/
+.vscode/
+.DS_Store
