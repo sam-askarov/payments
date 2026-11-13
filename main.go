@@ -30,11 +30,15 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, errorResponse{Error: msg})
+}
+
 func getPayment(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid id"})
+		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 	log.Println("id:", id)
@@ -43,7 +47,7 @@ func getPayment(w http.ResponseWriter, r *http.Request) {
 	defer mu.Unlock()
 	p, ok := payments[id]
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errorResponse{Error: "payment not found"})
+		writeError(w, http.StatusNotFound, "payment not found")
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
