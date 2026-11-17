@@ -64,6 +64,16 @@ func listPayments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+func createPayment(w http.ResponseWriter, r *http.Request) {
+	var p Payment
+	err := json.NewDecoder(r.Body).Decode(&p)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	writeJSON(w, http.StatusCreated, &p)
+}
+
 func main() {
 	p1 := Payment{ID: 1, Amount: 1000, Description: "transfer"}
 	p2 := Payment{ID: 2, Amount: 5000, Description: "transfer"}
@@ -81,6 +91,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /payments/{id}", getPayment)
 	mux.HandleFunc("GET /payments", listPayments)
+	mux.HandleFunc("POST /payments", createPayment)
 	log.Println("listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
