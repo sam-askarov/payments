@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -72,6 +73,17 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
+
+	if p.Amount <= 0 {
+		writeError(w, http.StatusBadRequest, "amount must be positive")
+		return
+	}
+
+	if strings.TrimSpace(p.Description) == "" {
+		writeError(w, http.StatusBadRequest, "description must not be empty")
+		return
+	}
+
 	mu.Lock()
 	defer mu.Unlock()
 
