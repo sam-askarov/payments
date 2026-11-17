@@ -11,7 +11,8 @@ import (
 
 var (
 	mu       sync.Mutex
-	payments = make(map[int64]Payment)
+	payments       = make(map[int64]Payment)
+	nextID   int64 = 3
 )
 
 type Payment struct {
@@ -71,7 +72,13 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	writeJSON(w, http.StatusCreated, &p)
+	mu.Lock()
+	defer mu.Unlock()
+
+	p.ID = nextID
+	nextID++
+	payments[p.ID] = p
+	writeJSON(w, http.StatusCreated, p)
 }
 
 func main() {
