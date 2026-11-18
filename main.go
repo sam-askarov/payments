@@ -93,6 +93,26 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, p)
 }
 
+func deletePayment(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	_, ok := payments[id]
+	if !ok {
+		writeError(w, http.StatusNotFound, "payment not found")
+		return
+	}
+
+	delete(payments, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func main() {
 	p1 := Payment{ID: 1, Amount: 1000, Description: "transfer"}
 	p2 := Payment{ID: 2, Amount: 5000, Description: "transfer"}
@@ -111,6 +131,7 @@ func main() {
 	mux.HandleFunc("GET /payments/{id}", getPayment)
 	mux.HandleFunc("GET /payments", listPayments)
 	mux.HandleFunc("POST /payments", createPayment)
+	mux.HandleFunc("DELETE /payments/{id}", deletePayment)
 	log.Println("listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
