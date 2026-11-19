@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -34,6 +35,17 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, errorResponse{Error: msg})
+}
+
+func validatePayment(p Payment) error {
+	if p.Amount <= 0 {
+		return errors.New("amount must be positive")
+	}
+
+	if strings.TrimSpace(p.Description) == "" {
+		return errors.New("description must not be empty")
+	}
+	return nil
 }
 
 func getPayment(w http.ResponseWriter, r *http.Request) {
@@ -74,13 +86,8 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if p.Amount <= 0 {
-		writeError(w, http.StatusBadRequest, "amount must be positive")
-		return
-	}
-
-	if strings.TrimSpace(p.Description) == "" {
-		writeError(w, http.StatusBadRequest, "description must not be empty")
+	if err := validatePayment(p); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -128,13 +135,8 @@ func updatePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if p.Amount <= 0 {
-		writeError(w, http.StatusBadRequest, "amount must be positive")
-		return
-	}
-
-	if strings.TrimSpace(p.Description) == "" {
-		writeError(w, http.StatusBadRequest, "description must not be empty")
+	if err := validatePayment(p); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
