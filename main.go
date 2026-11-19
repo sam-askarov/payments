@@ -37,6 +37,11 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, errorResponse{Error: msg})
 }
 
+func parseID(r *http.Request) (int64, error) {
+	idStr := r.PathValue("id")
+	return strconv.ParseInt(idStr, 10, 64)
+}
+
 func validatePayment(p Payment) error {
 	if p.Amount <= 0 {
 		return errors.New("amount must be positive")
@@ -49,13 +54,11 @@ func validatePayment(p Payment) error {
 }
 
 func getPayment(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	log.Println("id:", id)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -101,8 +104,7 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 }
 
 func deletePayment(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
@@ -121,8 +123,7 @@ func deletePayment(w http.ResponseWriter, r *http.Request) {
 }
 
 func updatePayment(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
