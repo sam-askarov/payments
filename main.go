@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -11,11 +10,7 @@ import (
 	"sync"
 )
 
-var (
-	mu       sync.Mutex
-	payments       = make(map[int64]Payment)
-	nextID   int64 = 3
-)
+var store = NewPaymentStore()
 var ErrPaymentNotFound = errors.New("payment not found")
 
 type Payment struct {
@@ -123,24 +118,21 @@ func getPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-	p, ok := payments[id]
-	if !ok {
-		writeError(w, http.StatusNotFound, "payment not found")
+	p, err := store.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPaymentNotFound):
+			writeError(w, http.StatusNotFound, "payment not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal error")
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
 }
 
 func listPayments(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	list := make([]Payment, 0, len(payments))
-	for _, p := range payments {
-		list = append(list, p)
-	}
+	list := store.List()
 	writeJSON(w, http.StatusOK, list)
 }
 
@@ -157,12 +149,7 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	p.ID = nextID
-	nextID++
-	payments[p.ID] = p
+	p = store.Create(p)
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -173,15 +160,16 @@ func deletePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-	_, ok := payments[id]
-	if !ok {
-		writeError(w, http.StatusNotFound, "payment not found")
+	err = store.Delete(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPaymentNotFound):
+			writeError(w, http.StatusNotFound, "payment not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal error")
+		}
 		return
 	}
-
-	delete(payments, id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -204,31 +192,22 @@ func updatePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-	_, ok := payments[id]
-	if !ok {
-		writeError(w, http.StatusNotFound, "payment not found")
+	p, err = store.Update(id, p)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPaymentNotFound):
+			writeError(w, http.StatusNotFound, "payment not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal error")
+		}
 		return
 	}
-	p.ID = id
-	payments[id] = p
 	writeJSON(w, http.StatusOK, p)
 }
 
 func main() {
-	p1 := Payment{ID: 1, Amount: 1000, Description: "transfer"}
-	p2 := Payment{ID: 2, Amount: 5000, Description: "transfer"}
-
-	mu.Lock()
-	payments[p1.ID] = p1
-	mu.Unlock()
-
-	mu.Lock()
-	payments[p2.ID] = p2
-	mu.Unlock()
-
-	fmt.Println(payments)
+	store.Create(Payment{Amount: 1000, Description: "transfer"})
+	store.Create(Payment{Amount: 5000, Description: "transfer"})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /payments/{id}", getPayment)
