@@ -16,6 +16,7 @@ var (
 	payments       = make(map[int64]Payment)
 	nextID   int64 = 3
 )
+var ErrPaymentNotFound = errors.New("payment not found")
 
 type Payment struct {
 	ID          int64  `json:"id"`
@@ -25,6 +26,68 @@ type Payment struct {
 
 type errorResponse struct {
 	Error string `json:"error"`
+}
+
+type PaymentStore struct {
+	mu       sync.Mutex
+	payments map[int64]Payment
+	nextID   int64
+}
+
+func NewPaymentStore() *PaymentStore {
+	return &PaymentStore{payments: make(map[int64]Payment), nextID: 1}
+}
+
+func (s *PaymentStore) Create(p Payment) Payment {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p.ID = s.nextID
+	s.nextID++
+	s.payments[p.ID] = p
+	return p
+}
+
+func (s *PaymentStore) Get(id int64) (Payment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.payments[id]
+	if !ok {
+		return Payment{}, ErrPaymentNotFound
+	}
+	return p, nil
+}
+
+func (s *PaymentStore) List() []Payment {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	list := make([]Payment, 0, len(s.payments))
+	for _, p := range s.payments {
+		list = append(list, p)
+	}
+	return list
+}
+
+func (s *PaymentStore) Update(id int64, p Payment) (Payment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.payments[id]
+	if !ok {
+		return Payment{}, ErrPaymentNotFound
+	}
+	p.ID = id
+	s.payments[id] = p
+	return p, nil
+}
+
+func (s *PaymentStore) Delete(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.payments[id]
+	if !ok {
+		return ErrPaymentNotFound
+	}
+	delete(s.payments, id)
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
