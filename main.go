@@ -10,7 +10,6 @@ import (
 	"sync"
 )
 
-var store = NewPaymentStore()
 var ErrPaymentNotFound = errors.New("payment not found")
 
 type Payment struct {
@@ -85,6 +84,14 @@ func (s *PaymentStore) Delete(id int64) error {
 	return nil
 }
 
+type PaymentHandler struct {
+	store *PaymentStore
+}
+
+func NewPaymentHandler(store *PaymentStore) *PaymentHandler {
+	return &PaymentHandler{store: store}
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -111,14 +118,14 @@ func validatePayment(p Payment) error {
 	return nil
 }
 
-func getPayment(w http.ResponseWriter, r *http.Request) {
+func (h *PaymentHandler) getPayment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 
-	p, err := store.Get(id)
+	p, err := h.store.Get(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPaymentNotFound):
@@ -131,12 +138,12 @@ func getPayment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
-func listPayments(w http.ResponseWriter, r *http.Request) {
-	list := store.List()
+func (h *PaymentHandler) listPayments(w http.ResponseWriter, r *http.Request) {
+	list := h.store.List()
 	writeJSON(w, http.StatusOK, list)
 }
 
-func createPayment(w http.ResponseWriter, r *http.Request) {
+func (h *PaymentHandler) createPayment(w http.ResponseWriter, r *http.Request) {
 	var p Payment
 	err := json.NewDecoder(r.Body).Decode(&p)
 	if err != nil {
@@ -149,18 +156,18 @@ func createPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p = store.Create(p)
+	p = h.store.Create(p)
 	writeJSON(w, http.StatusCreated, p)
 }
 
-func deletePayment(w http.ResponseWriter, r *http.Request) {
+func (h *PaymentHandler) deletePayment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 
-	err = store.Delete(id)
+	err = h.store.Delete(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPaymentNotFound):
@@ -173,7 +180,7 @@ func deletePayment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func updatePayment(w http.ResponseWriter, r *http.Request) {
+func (h *PaymentHandler) updatePayment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
@@ -192,7 +199,7 @@ func updatePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, err = store.Update(id, p)
+	p, err = h.store.Update(id, p)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPaymentNotFound):
@@ -206,15 +213,17 @@ func updatePayment(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	store := NewPaymentStore()
 	store.Create(Payment{Amount: 1000, Description: "transfer"})
 	store.Create(Payment{Amount: 5000, Description: "transfer"})
 
+	h := NewPaymentHandler(store)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /payments/{id}", getPayment)
-	mux.HandleFunc("GET /payments", listPayments)
-	mux.HandleFunc("POST /payments", createPayment)
-	mux.HandleFunc("DELETE /payments/{id}", deletePayment)
-	mux.HandleFunc("PUT /payments/{id}", updatePayment)
+	mux.HandleFunc("GET /payments/{id}", h.getPayment)
+	mux.HandleFunc("GET /payments", h.listPayments)
+	mux.HandleFunc("POST /payments", h.createPayment)
+	mux.HandleFunc("DELETE /payments/{id}", h.deletePayment)
+	mux.HandleFunc("PUT /payments/{id}", h.updatePayment)
 	log.Println("listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
